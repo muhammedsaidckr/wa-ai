@@ -1,0 +1,80 @@
+# Git
+.git
+.gitignore
+.github
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+venv/
+env/
+ENV/
+.venv
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Data
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Media
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.mp3
+*.mp4
+*.ogg
+*.pdf
+*.doc
+*.docx
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+tests/
+
+# Documentation
+*.md
+!README.md
+DEPLOYMENT.md
+
+# Docker
+Dockerfile.dev
+docker-compose.yml
+docker-compose.*.yml
+!docker-compose.prod.yml
+
+# Nginx
+nginx/
+nginx-config.conf
+
+# Misc
+.dockerignore

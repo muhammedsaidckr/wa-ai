@@ -76,7 +76,20 @@ alembic/versions/*.pyc
 .ipynb_checkpoints
 
 # Docker
-.dockerignore
+# .dockerignore is tracked
 
-# Deployment docs
+# Nginx configuration (server-specific)
+nginx-config.conf
+nginx/
+*.conf
+
+# Deployment docs and scripts
 DEPLOYMENT.md
+DOCKER_DEPLOY.md
+UPDATE_GUIDE.md
+deploy.sh
+
+# Backups
+backups/
+*.backup
+*.bak
