@@ -87,6 +87,7 @@ nginx/
 DEPLOYMENT.md
 DOCKER_DEPLOY.md
 UPDATE_GUIDE.md
+META_WHATSAPP_SETUP.md
 deploy.sh
 
 # Backups
