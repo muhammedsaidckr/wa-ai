@@ -72,28 +72,44 @@ class OpenAIService:
 
             # Call OpenAI API
             # Build base params
+            from openai import BadRequestError
+
             completion_params = {
                 "model": self.model,
-                "messages": context,
-                "temperature": self.temperature
+                "messages": context
             }
 
-            # Try with max_completion_tokens first (for newer models)
-            # Fall back to max_tokens if not supported
+            # Some models (like o1, gpt-5-nano) don't support temperature parameter
+            # Only add temperature for models that support it
+            if not any(m in self.model.lower() for m in ["o1", "gpt-5-nano"]):
+                completion_params["temperature"] = self.temperature
+
+            # Try with appropriate token parameter based on model
+            # Newer models require max_completion_tokens, older ones use max_tokens
+            # Detect if model likely needs max_completion_tokens
+            use_completion_tokens = any(m in self.model.lower() for m in ["gpt-4-turbo", "gpt-4o", "o1", "gpt-5"])
+
             try:
-                # Newer models (gpt-4-turbo, gpt-4o, o1, gpt-5) require max_completion_tokens
-                if any(m in self.model.lower() for m in ["gpt-4-turbo", "gpt-4o", "o1", "gpt-5"]):
+                if use_completion_tokens:
                     completion_params["max_completion_tokens"] = self.max_tokens
                 else:
                     completion_params["max_tokens"] = self.max_tokens
 
                 response = self.client.chat.completions.create(**completion_params)
-            except TypeError as e:
-                # If max_completion_tokens not supported, try with max_tokens
-                if "max_completion_tokens" in str(e):
-                    logger.warning("max_completion_tokens not supported, falling back to max_tokens")
+            except (TypeError, BadRequestError) as e:
+                error_msg = str(e)
+                # If we got parameter error, try the opposite parameter
+                # TypeError = SDK doesn't support the parameter
+                # BadRequestError = API doesn't support the parameter
+                if "max_completion_tokens" in error_msg:
+                    logger.warning("max_completion_tokens not supported by SDK/API, retrying with max_tokens")
                     completion_params.pop("max_completion_tokens", None)
                     completion_params["max_tokens"] = self.max_tokens
+                    response = self.client.chat.completions.create(**completion_params)
+                elif "max_tokens" in error_msg:
+                    logger.warning("max_tokens not supported by API, retrying with max_completion_tokens")
+                    completion_params.pop("max_tokens", None)
+                    completion_params["max_completion_tokens"] = self.max_tokens
                     response = self.client.chat.completions.create(**completion_params)
                 else:
                     raise
@@ -148,19 +164,29 @@ class OpenAIService:
                 ]
             }
 
-            # Try with max_completion_tokens first, fall back to max_tokens
+            # Try with appropriate token parameter based on model
+            from openai import BadRequestError
+
+            use_completion_tokens = any(m in settings.vision_model.lower() for m in ["gpt-4-turbo", "gpt-4o", "o1", "gpt-5"])
+
             try:
-                if any(m in settings.vision_model.lower() for m in ["gpt-4-turbo", "gpt-4o", "o1", "gpt-5"]):
+                if use_completion_tokens:
                     vision_params["max_completion_tokens"] = settings.vision_max_tokens
                 else:
                     vision_params["max_tokens"] = settings.vision_max_tokens
 
                 response = self.client.chat.completions.create(**vision_params)
-            except TypeError as e:
-                if "max_completion_tokens" in str(e):
-                    logger.warning("max_completion_tokens not supported, falling back to max_tokens")
+            except (TypeError, BadRequestError) as e:
+                error_msg = str(e)
+                if "max_completion_tokens" in error_msg:
+                    logger.warning("max_completion_tokens not supported by SDK/API, retrying with max_tokens")
                     vision_params.pop("max_completion_tokens", None)
                     vision_params["max_tokens"] = settings.vision_max_tokens
+                    response = self.client.chat.completions.create(**vision_params)
+                elif "max_tokens" in error_msg:
+                    logger.warning("max_tokens not supported by API, retrying with max_completion_tokens")
+                    vision_params.pop("max_tokens", None)
+                    vision_params["max_completion_tokens"] = settings.vision_max_tokens
                     response = self.client.chat.completions.create(**vision_params)
                 else:
                     raise
