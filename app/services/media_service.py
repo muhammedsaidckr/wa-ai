@@ -35,7 +35,7 @@ class MediaService:
             Path to downloaded file or None if failed
         """
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
                 # Make request with optional authentication
                 if auth:
                     response = await client.get(media_url, auth=auth)
