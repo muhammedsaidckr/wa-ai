@@ -68,12 +68,20 @@ class OpenAIService:
             context = self.build_conversation_context(messages)
 
             # Call OpenAI API
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=context,
-                max_tokens=self.max_tokens,
-                temperature=self.temperature
-            )
+            # Use max_completion_tokens for newer models (gpt-4-turbo and later)
+            completion_params = {
+                "model": self.model,
+                "messages": context,
+                "temperature": self.temperature
+            }
+
+            # Newer models use max_completion_tokens instead of max_tokens
+            if "gpt-4-turbo" in self.model or "gpt-4o" in self.model or "o1" in self.model or "gpt-5" in self.model:
+                completion_params["max_completion_tokens"] = self.max_tokens
+            else:
+                completion_params["max_tokens"] = self.max_tokens
+
+            response = self.client.chat.completions.create(**completion_params)
 
             # Extract response
             assistant_message = response.choices[0].message.content
@@ -108,9 +116,10 @@ class OpenAIService:
             default_prompt = "Describe this image in detail. What do you see?"
             analysis_prompt = prompt or default_prompt
 
-            response = self.client.chat.completions.create(
-                model=settings.vision_model,
-                messages=[
+            # Build vision API params
+            vision_params = {
+                "model": settings.vision_model,
+                "messages": [
                     {
                         "role": "user",
                         "content": [
@@ -121,9 +130,16 @@ class OpenAIService:
                             }
                         ]
                     }
-                ],
-                max_tokens=settings.vision_max_tokens
-            )
+                ]
+            }
+
+            # Newer models use max_completion_tokens instead of max_tokens
+            if "gpt-4-turbo" in settings.vision_model or "gpt-4o" in settings.vision_model or "o1" in settings.vision_model or "gpt-5" in settings.vision_model:
+                vision_params["max_completion_tokens"] = settings.vision_max_tokens
+            else:
+                vision_params["max_tokens"] = settings.vision_max_tokens
+
+            response = self.client.chat.completions.create(**vision_params)
 
             analysis = response.choices[0].message.content
             prompt_tokens = response.usage.prompt_tokens

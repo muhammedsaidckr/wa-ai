@@ -7,7 +7,7 @@ services:
   whatsapp-bot:
     # Replace 'username/repo' with your GitHub username and repository name
     # Example: ghcr.io/said/wa-yapay-backend:latest
-    image: ghcr.io/USERNAME/REPO:latest
+    image: ghcr.io/muhammedsaidckr/wa-ai:latest
     container_name: whatsapp-ai-bot
     ports:
       - "8000:8000"
