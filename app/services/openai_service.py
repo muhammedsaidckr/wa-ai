@@ -71,20 +71,32 @@ class OpenAIService:
             context = self.build_conversation_context(messages)
 
             # Call OpenAI API
-            # Use max_completion_tokens for newer models (gpt-4-turbo and later)
+            # Build base params
             completion_params = {
                 "model": self.model,
                 "messages": context,
                 "temperature": self.temperature
             }
 
-            # Newer models use max_completion_tokens instead of max_tokens
-            if "gpt-4-turbo" in self.model or "gpt-4o" in self.model or "o1" in self.model or "gpt-5" in self.model:
-                completion_params["max_completion_tokens"] = self.max_tokens
-            else:
-                completion_params["max_tokens"] = self.max_tokens
+            # Try with max_completion_tokens first (for newer models)
+            # Fall back to max_tokens if not supported
+            try:
+                # Newer models (gpt-4-turbo, gpt-4o, o1, gpt-5) require max_completion_tokens
+                if any(m in self.model.lower() for m in ["gpt-4-turbo", "gpt-4o", "o1", "gpt-5"]):
+                    completion_params["max_completion_tokens"] = self.max_tokens
+                else:
+                    completion_params["max_tokens"] = self.max_tokens
 
-            response = self.client.chat.completions.create(**completion_params)
+                response = self.client.chat.completions.create(**completion_params)
+            except TypeError as e:
+                # If max_completion_tokens not supported, try with max_tokens
+                if "max_completion_tokens" in str(e):
+                    logger.warning("max_completion_tokens not supported, falling back to max_tokens")
+                    completion_params.pop("max_completion_tokens", None)
+                    completion_params["max_tokens"] = self.max_tokens
+                    response = self.client.chat.completions.create(**completion_params)
+                else:
+                    raise
 
             # Extract response
             assistant_message = response.choices[0].message.content
@@ -136,13 +148,22 @@ class OpenAIService:
                 ]
             }
 
-            # Newer models use max_completion_tokens instead of max_tokens
-            if "gpt-4-turbo" in settings.vision_model or "gpt-4o" in settings.vision_model or "o1" in settings.vision_model or "gpt-5" in settings.vision_model:
-                vision_params["max_completion_tokens"] = settings.vision_max_tokens
-            else:
-                vision_params["max_tokens"] = settings.vision_max_tokens
+            # Try with max_completion_tokens first, fall back to max_tokens
+            try:
+                if any(m in settings.vision_model.lower() for m in ["gpt-4-turbo", "gpt-4o", "o1", "gpt-5"]):
+                    vision_params["max_completion_tokens"] = settings.vision_max_tokens
+                else:
+                    vision_params["max_tokens"] = settings.vision_max_tokens
 
-            response = self.client.chat.completions.create(**vision_params)
+                response = self.client.chat.completions.create(**vision_params)
+            except TypeError as e:
+                if "max_completion_tokens" in str(e):
+                    logger.warning("max_completion_tokens not supported, falling back to max_tokens")
+                    vision_params.pop("max_completion_tokens", None)
+                    vision_params["max_tokens"] = settings.vision_max_tokens
+                    response = self.client.chat.completions.create(**vision_params)
+                else:
+                    raise
 
             analysis = response.choices[0].message.content
             prompt_tokens = response.usage.prompt_tokens
