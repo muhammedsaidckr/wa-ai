@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.api.webhook import router as webhook_router
+from app.api.meta_webhook import router as meta_webhook_router
 from app.models.database import create_db_engine, init_database, get_database_url
 from config.settings import settings
 
@@ -86,7 +87,8 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(webhook_router, tags=["Webhook"])
+app.include_router(webhook_router, tags=["Twilio Webhook"])
+app.include_router(meta_webhook_router, tags=["Meta Webhook"])
 
 
 @app.get("/")

@@ -6,6 +6,7 @@ from app.models.database import MessageType, MessageDirection
 from app.models.crud import UserCRUD, ConversationCRUD, MessageCRUD
 from app.services.openai_service import openai_service
 from app.services.twilio_service import twilio_service
+from app.services.meta_whatsapp_service import meta_whatsapp_service
 from app.services.media_service import media_service
 from config.settings import settings
 
@@ -18,6 +19,7 @@ class MessageProcessor:
     def __init__(self, db: Session):
         self.db = db
         self.whitelisted_numbers = settings.get_whitelisted_numbers()
+        self.provider = settings.whatsapp_provider  # "twilio" or "meta"
 
     async def process_incoming_message(
         self,
@@ -330,9 +332,12 @@ class MessageProcessor:
         user_id: int,
         conversation_id: int
     ):
-        """Send response message via Twilio"""
-        # Send via Twilio
-        message_sid = await twilio_service.send_message(to_number, message)
+        """Send response message via configured provider (Twilio or Meta)"""
+        # Send via appropriate provider
+        if self.provider == "meta":
+            message_sid = await meta_whatsapp_service.send_message(to_number, message)
+        else:  # twilio
+            message_sid = await twilio_service.send_message(to_number, message)
 
         # Record outgoing message
         if message_sid:
@@ -343,21 +348,27 @@ class MessageProcessor:
                 direction=MessageDirection.OUTGOING,
                 message_type=MessageType.TEXT,
                 content=message,
-                twilio_message_sid=message_sid
+                twilio_message_sid=message_sid  # Also used for Meta message ID
             )
 
     async def _send_not_whitelisted_message(self, to_number: str):
         """Send message to non-whitelisted user"""
         message = (
-            "Sorry, you are not authorized to use this bot. "
-            "Please contact the administrator for access."
+            "Üzgünüm, bu botu kullanma yetkiniz yok. "
+            "Erişim için lütfen yönetici ile iletişime geçin."
         )
-        await twilio_service.send_message(to_number, message)
+        if self.provider == "meta":
+            await meta_whatsapp_service.send_message(to_number, message)
+        else:
+            await twilio_service.send_message(to_number, message)
 
     async def _send_error_message(self, to_number: str):
         """Send error message to user"""
         message = (
-            "Sorry, I encountered an error processing your message. "
-            "Please try again later."
+            "Üzgünüm, mesajınızı işlerken bir hata oluştu. "
+            "Lütfen daha sonra tekrar deneyin."
         )
-        await twilio_service.send_message(to_number, message)
+        if self.provider == "meta":
+            await meta_whatsapp_service.send_message(to_number, message)
+        else:
+            await twilio_service.send_message(to_number, message)

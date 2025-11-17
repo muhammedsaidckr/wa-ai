@@ -22,11 +22,20 @@ class Settings(BaseSettings):
         alias="DATABASE_URL"
     )
 
-    # Twilio
-    twilio_account_sid: str = Field(..., alias="TWILIO_ACCOUNT_SID")
-    twilio_auth_token: str = Field(..., alias="TWILIO_AUTH_TOKEN")
-    twilio_whatsapp_number: str = Field(..., alias="TWILIO_WHATSAPP_NUMBER")
+    # WhatsApp Provider (twilio or meta)
+    whatsapp_provider: str = Field(default="twilio", alias="WHATSAPP_PROVIDER")
+
+    # Twilio (optional if using Meta)
+    twilio_account_sid: str = Field(default="", alias="TWILIO_ACCOUNT_SID")
+    twilio_auth_token: str = Field(default="", alias="TWILIO_AUTH_TOKEN")
+    twilio_whatsapp_number: str = Field(default="", alias="TWILIO_WHATSAPP_NUMBER")
     twilio_webhook_url: str = Field(default="", alias="TWILIO_WEBHOOK_URL")
+
+    # Meta WhatsApp Cloud API (optional if using Twilio)
+    meta_access_token: str = Field(default="", alias="META_ACCESS_TOKEN")
+    meta_phone_number_id: str = Field(default="", alias="META_PHONE_NUMBER_ID")
+    meta_business_account_id: str = Field(default="", alias="META_BUSINESS_ACCOUNT_ID")
+    meta_webhook_verify_token: str = Field(default="", alias="META_WEBHOOK_VERIFY_TOKEN")
 
     # OpenAI
     openai_api_key: str = Field(..., alias="OPENAI_API_KEY")
