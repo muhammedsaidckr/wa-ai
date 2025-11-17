@@ -71,7 +71,9 @@ async def webhook_handler(
     MediaUrl0: Optional[str] = Form(default=None),
     MediaContentType0: Optional[str] = Form(default=None),
     ProfileName: Optional[str] = Form(default=None),
-    x_twilio_signature: Optional[str] = Header(default=None, alias="X-Twilio-Signature")
+    x_twilio_signature: Optional[str] = Header(default=None, alias="X-Twilio-Signature"),
+    x_forwarded_proto: Optional[str] = Header(default=None, alias="X-Forwarded-Proto"),
+    x_forwarded_host: Optional[str] = Header(default=None, alias="X-Forwarded-Host")
 ):
     """
     Webhook endpoint for receiving WhatsApp messages from Twilio
@@ -79,8 +81,13 @@ async def webhook_handler(
     Twilio sends webhook with form data containing message details
     """
     try:
-        # Get request URL for signature verification
-        url = str(request.url)
+        # Reconstruct original URL for signature verification (handle proxy)
+        if x_forwarded_proto and x_forwarded_host:
+            # Request came through proxy - use forwarded headers
+            url = f"{x_forwarded_proto}://{x_forwarded_host}{request.url.path}"
+        else:
+            # Direct request - use request URL
+            url = str(request.url)
 
         # Get form data for signature verification
         form_data = await request.form()

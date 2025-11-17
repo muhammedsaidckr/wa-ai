@@ -77,3 +77,6 @@ alembic/versions/*.pyc
 
 # Docker
 .dockerignore
+
+# Deployment docs
+DEPLOYMENT.md
