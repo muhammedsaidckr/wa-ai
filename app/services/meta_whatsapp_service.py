@@ -16,7 +16,7 @@ class MetaWhatsAppService:
     """Service for Meta WhatsApp Cloud API interactions"""
 
     def __init__(self):
-        self.api_version = "v21.0"  # Latest as of Nov 2025
+        self.api_version = "v24.0"  # Latest as of Nov 2025
         self.base_url = f"https://graph.facebook.com/{self.api_version}"
         self.phone_number_id = settings.meta_phone_number_id
         self.access_token = settings.meta_access_token
@@ -26,7 +26,7 @@ class MetaWhatsAppService:
         to_number: str,
         message: str,
         media_url: Optional[str] = None,
-        media_type: Optional[str] = None
+        media_type: Optional[str] = None,
     ) -> Optional[str]:
         """
         Send WhatsApp message via Meta Cloud API
@@ -47,7 +47,7 @@ class MetaWhatsAppService:
             url = f"{self.base_url}/{self.phone_number_id}/messages"
             headers = {
                 "Authorization": f"Bearer {self.access_token}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
             }
 
             # Build message payload
@@ -60,8 +60,8 @@ class MetaWhatsAppService:
                     "type": media_type,
                     media_type: {
                         "link": media_url,
-                        "caption": message if message else None
-                    }
+                        "caption": message if message else None,
+                    },
                 }
             else:
                 # Send text message
@@ -70,10 +70,7 @@ class MetaWhatsAppService:
                     "recipient_type": "individual",
                     "to": clean_number,
                     "type": "text",
-                    "text": {
-                        "preview_url": False,
-                        "body": message
-                    }
+                    "text": {"preview_url": False, "body": message},
                 }
 
             async with httpx.AsyncClient() as client:
@@ -87,17 +84,13 @@ class MetaWhatsAppService:
                     "meta_message_sent",
                     to=clean_number,
                     message_id=message_id,
-                    has_media=bool(media_url)
+                    has_media=bool(media_url),
                 )
 
                 return message_id
 
         except Exception as e:
-            logger.error(
-                "meta_message_send_error",
-                error=str(e),
-                to=to_number
-            )
+            logger.error("meta_message_send_error", error=str(e), to=to_number)
             return None
 
     async def download_media(self, media_id: str) -> Optional[bytes]:
@@ -133,7 +126,7 @@ class MetaWhatsAppService:
                 logger.info(
                     "meta_media_downloaded",
                     media_id=media_id,
-                    size_bytes=len(media_response.content)
+                    size_bytes=len(media_response.content),
                 )
 
                 return media_response.content
@@ -156,12 +149,12 @@ class MetaWhatsAppService:
             url = f"{self.base_url}/{self.phone_number_id}/messages"
             headers = {
                 "Authorization": f"Bearer {self.access_token}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
             }
             payload = {
                 "messaging_product": "whatsapp",
                 "status": "read",
-                "message_id": message_id
+                "message_id": message_id,
             }
 
             async with httpx.AsyncClient() as client:
