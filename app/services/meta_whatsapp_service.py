@@ -70,7 +70,7 @@ class MetaWhatsAppService:
                     "recipient_type": "individual",
                     "to": clean_number,
                     "type": "text",
-                    "text": {"preview_url": False, "body": message},
+                    "text": {"body": message},
                 }
 
             async with httpx.AsyncClient() as client:
