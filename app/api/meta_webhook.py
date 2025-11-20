@@ -127,6 +127,18 @@ async def process_meta_message(message: Dict[str, Any], value: Dict[str, Any], d
         from_number = message.get("from")  # Phone number without +
         timestamp = message.get("timestamp")
 
+        # Check for duplicate message and delete it (for testing purposes)
+        from app.models.crud import MessageCRUD
+        existing_message = MessageCRUD.get_message_by_sid(db, message_id)
+        if existing_message:
+            logger.info(
+                "duplicate_message_deleting",
+                message_id=message_id,
+                from_number=from_number
+            )
+            db.delete(existing_message)
+            db.commit()
+
         # Add + to phone number
         from_number_formatted = f"+{from_number}"
 
