@@ -119,6 +119,15 @@ class OpenAIService:
             prompt_tokens = response.usage.prompt_tokens
             completion_tokens = response.usage.completion_tokens
 
+            # Ensure we have a valid response
+            if not assistant_message or not assistant_message.strip():
+                logger.error(
+                    "openai_empty_response",
+                    model=self.model,
+                    content_value=repr(assistant_message),
+                )
+                assistant_message = "Üzgünüm, şu anda bir yanıt oluşturamadım. Lütfen tekrar deneyin."
+
             logger.info(
                 "openai_response_generated",
                 model=self.model,

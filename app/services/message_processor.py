@@ -107,6 +107,12 @@ class MessageProcessor:
                 response_text = "Sorry, I cannot process this type of message yet."
 
             # Send response
+            logger.info(
+                "sending_response",
+                from_number=from_number,
+                response_length=len(response_text) if response_text else 0,
+                response_preview=response_text[:100] if response_text else "EMPTY",
+            )
             await self._send_response(
                 from_number, response_text, user.id, conversation.id
             )
@@ -301,6 +307,15 @@ class MessageProcessor:
         self, to_number: str, message: str, user_id: int, conversation_id: int
     ):
         """Send response message via configured provider (Twilio or Meta)"""
+        # Validate message is not empty
+        if not message or not message.strip():
+            logger.error(
+                "empty_response_message",
+                to_number=to_number,
+                message_value=repr(message),
+            )
+            message = "Üzgünüm, bir yanıt oluşturamadım. Lütfen tekrar deneyin."
+
         # Send via appropriate provider
         if self.provider == "meta":
             message_sid = await meta_whatsapp_service.send_message(to_number, message)
