@@ -75,6 +75,18 @@ class MetaWhatsAppService:
 
             async with httpx.AsyncClient() as client:
                 response = await client.post(url, json=payload, headers=headers)
+
+                if response.status_code != 200:
+                    error_detail = response.text
+                    logger.error(
+                        "meta_api_error",
+                        status_code=response.status_code,
+                        error_detail=error_detail,
+                        to=clean_number,
+                        payload=payload,
+                    )
+                    return None
+
                 response.raise_for_status()
 
                 result = response.json()
