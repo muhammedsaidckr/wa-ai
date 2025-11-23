@@ -124,7 +124,7 @@ class MessageProcessor:
 
         except Exception as e:
             logger.error("message_processing_error", error=str(e), phone=from_number)
-            await self._send_error_message(from_number)
+            await self._send_error_message(from_number, waha_chat_id)
             return False
 
     async def _process_text_message(
@@ -339,27 +339,27 @@ class MessageProcessor:
                 twilio_message_sid=message_sid,  # Also used for Meta/WAHA message ID
             )
 
-    async def _send_not_whitelisted_message(self, to_number: str):
+    async def _send_not_whitelisted_message(self, to_number: str, waha_chat_id: Optional[str] = None):
         """Send message to non-whitelisted user"""
         message = (
             "Üzgünüm, bu botu kullanma yetkiniz yok. "
             "Erişim için lütfen yönetici ile iletişime geçin."
         )
         if self.provider == "waha":
-            await waha_service.send_message(to_number, message)
+            await waha_service.send_message(to_number, message, waha_chat_id=waha_chat_id)
         elif self.provider == "meta":
             await meta_whatsapp_service.send_message(to_number, message)
         else:
             await twilio_service.send_message(to_number, message)
 
-    async def _send_error_message(self, to_number: str):
+    async def _send_error_message(self, to_number: str, waha_chat_id: Optional[str] = None):
         """Send error message to user"""
         message = (
             "Üzgünüm, mesajınızı işlerken bir hata oluştu. "
             "Lütfen daha sonra tekrar deneyin."
         )
         if self.provider == "waha":
-            await waha_service.send_message(to_number, message)
+            await waha_service.send_message(to_number, message, waha_chat_id=waha_chat_id)
         elif self.provider == "meta":
             await meta_whatsapp_service.send_message(to_number, message)
         else:

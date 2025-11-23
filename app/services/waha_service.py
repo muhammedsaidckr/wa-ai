@@ -272,7 +272,15 @@ class WAHAService:
                 response.raise_for_status()
 
                 result = response.json()
-                message_id = result.get("id")
+
+                # WAHA returns message object with id field that can be dict or string
+                # Extract the serialized string ID for database storage
+                message_id_field = result.get("id")
+                if isinstance(message_id_field, dict):
+                    # If id is a dict, use _serialized field as the unique identifier
+                    message_id = message_id_field.get("_serialized") or str(message_id_field)
+                else:
+                    message_id = message_id_field
 
                 logger.info(
                     "waha_message_sent",
