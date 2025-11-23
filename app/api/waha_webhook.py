@@ -37,12 +37,73 @@ def get_db():
         db.close()
 
 
+def _get_primary_media(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Return the first media dict (if any) from WAHA payloads."""
+    media = payload.get("media")
+    if isinstance(media, dict):
+        return media
+    if isinstance(media, list) and media:
+        for item in media:
+            if isinstance(item, dict):
+                return item
+    return {}
+
+
+def _extract_media_mimetype(payload: Dict[str, Any]) -> Optional[str]:
+    media = _get_primary_media(payload)
+    mimetype = media.get("mimetype") or media.get("mimeType")
+    if not mimetype:
+        mimetype = payload.get("mediaContentType")
+    return mimetype
+
+
+def _extract_media_url(payload: Dict[str, Any]) -> Optional[str]:
+    media_url = payload.get("mediaUrl") or payload.get("mediaURL")
+    if isinstance(media_url, str) and media_url.startswith(("http://", "https://")):
+        return media_url
+
+    media = _get_primary_media(payload)
+    if media:
+        url = media.get("url") or media.get("directPath")
+        if isinstance(url, str) and url.startswith(("http://", "https://")):
+            return url
+
+    data_section = payload.get("_data") or {}
+    direct_path = data_section.get("directPath")
+    if isinstance(direct_path, str) and direct_path.startswith(("http://", "https://")):
+        return direct_path
+    return None
+
+
 def detect_message_type_waha(message_data: Dict[str, Any]) -> MessageType:
     """Detect message type from WAHA webhook data"""
-    msg_type = message_data.get("type", "chat")
+    msg_type = message_data.get("type")
+    if not msg_type:
+        msg_type = (message_data.get("_data") or {}).get("type")
+
+    if not msg_type:
+        mimetype = (_extract_media_mimetype(message_data) or "").lower()
+        if mimetype.startswith("image/"):
+            msg_type = "image"
+        elif mimetype.startswith("audio/"):
+            msg_type = "audio"
+        elif mimetype.startswith("video/"):
+            msg_type = "video"
+        elif mimetype in ("application/pdf", "application/msword",
+                          "application/vnd.openxmlformats-officedocument.wordprocessingml.document"):
+            msg_type = "document"
+        elif mimetype:
+            msg_type = "document"
+
+    if not msg_type and message_data.get("hasMedia"):
+        # WAHA sometimes omits type but still flags hasMedia
+        msg_type = "image"
+
+    msg_type = (msg_type or "chat").lower()
 
     type_mapping = {
         "chat": MessageType.TEXT,
+        "text": MessageType.TEXT,
         "image": MessageType.IMAGE,
         "audio": MessageType.AUDIO,
         "voice": MessageType.AUDIO,
@@ -133,30 +194,31 @@ async def process_waha_message(payload: Dict[str, Any], session: str, db: Sessio
             db.delete(existing_message)
             db.commit()
 
-        # Get message type and content
-        msg_type = payload.get("type", "chat")
+        # Detect message type and prepare content
+        message_type = detect_message_type_waha(payload)
         message_body = ""
         media_url = None
         media_content_type = None
 
-        # Extract message content based on type
-        if msg_type == "chat":
+        if message_type == MessageType.TEXT:
             message_body = payload.get("body", "")
-        elif msg_type == "image":
-            media_url = payload.get("mediaUrl") or payload.get("media", {}).get("url")
-            message_body = payload.get("caption", "")
-            media_content_type = "image"
-        elif msg_type in ["audio", "voice", "ptt"]:
-            media_url = payload.get("mediaUrl") or payload.get("media", {}).get("url")
-            media_content_type = "audio"
-        elif msg_type == "video":
-            media_url = payload.get("mediaUrl") or payload.get("media", {}).get("url")
-            message_body = payload.get("caption", "")
-            media_content_type = "video"
-        elif msg_type == "document":
-            media_url = payload.get("mediaUrl") or payload.get("media", {}).get("url")
-            message_body = payload.get("caption", "")
-            media_content_type = "document"
+        elif message_type == MessageType.IMAGE:
+            media_url = _extract_media_url(payload)
+            message_body = payload.get("caption") or payload.get("body", "")
+            media_content_type = _extract_media_mimetype(payload) or "image/jpeg"
+        elif message_type in [MessageType.AUDIO]:
+            media_url = _extract_media_url(payload)
+            media_content_type = _extract_media_mimetype(payload) or "audio/ogg"
+        elif message_type == MessageType.VIDEO:
+            media_url = _extract_media_url(payload)
+            message_body = payload.get("caption") or ""
+            media_content_type = _extract_media_mimetype(payload) or "video/mp4"
+        elif message_type == MessageType.DOCUMENT:
+            media_url = _extract_media_url(payload)
+            message_body = payload.get("caption") or ""
+            media_content_type = _extract_media_mimetype(payload) or "application/octet-stream"
+        else:
+            message_body = payload.get("body", "")
 
         # Get contact name
         contact_name = payload.get("_data", {}).get("notifyName") or payload.get("author")
@@ -165,7 +227,7 @@ async def process_waha_message(payload: Dict[str, Any], session: str, db: Sessio
             "waha_message_details",
             from_number=from_number_formatted,
             message_id=message_id,
-            type=msg_type,
+            type=message_type.value if isinstance(message_type, MessageType) else str(message_type),
             has_media=bool(media_url)
         )
 
@@ -173,9 +235,6 @@ async def process_waha_message(payload: Dict[str, Any], session: str, db: Sessio
         if not rate_limiter.is_allowed(from_number_formatted):
             logger.warning("rate_limit_exceeded", phone=from_number_formatted)
             return
-
-        # Detect message type
-        message_type = detect_message_type_waha(payload)
 
         # Create message processor
         processor = MessageProcessor(db)
