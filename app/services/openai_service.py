@@ -336,13 +336,17 @@ class OpenAIService:
 
         output = getattr(response, "output", None) or []
         collected = []
+        reasoning_fallback = []
         for item in output:
+            item_type = getattr(item, "type", None)
+            if item_type is None and isinstance(item, dict):
+                item_type = item.get("type")
+
             contents = getattr(item, "content", None)
-            if contents is None:
-                if isinstance(item, dict):
-                    contents = item.get("content", [])
-                else:
-                    contents = []
+            if contents is None and isinstance(item, dict):
+                contents = item.get("content", [])
+            contents = contents or []
+
             for content in contents:
                 content_type = getattr(content, "type", None)
                 if content_type is None and isinstance(content, dict):
@@ -353,7 +357,31 @@ class OpenAIService:
                         text_value = content.get("text")
                     if text_value:
                         collected.append(text_value)
-        return "\n".join(collected).strip()
+                elif content_type == "reasoning_text":
+                    text_value = getattr(content, "text", None)
+                    if text_value is None and isinstance(content, dict):
+                        text_value = content.get("text")
+                    if text_value:
+                        reasoning_fallback.append(text_value)
+
+            if item_type == "reasoning":
+                summaries = getattr(item, "summary", None)
+                if summaries is None and isinstance(item, dict):
+                    summaries = item.get("summary", [])
+                for summary in summaries or []:
+                    text_value = getattr(summary, "text", None)
+                    if text_value is None and isinstance(summary, dict):
+                        text_value = summary.get("text")
+                    if text_value:
+                        reasoning_fallback.append(text_value)
+
+        if collected:
+            return "\n".join(collected).strip()
+
+        if reasoning_fallback:
+            return "\n\n".join(reasoning_fallback).strip()
+
+        return ""
 
     @staticmethod
     def _supports_temperature(model_name: str) -> bool:
