@@ -11,7 +11,7 @@ alembic==1.12.1
 twilio==8.10.0
 
 # OpenAI SDK
-openai>=1.50.0
+openai>=2.8.1
 
 # HTTP Client
 httpx==0.25.1

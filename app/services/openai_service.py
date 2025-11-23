@@ -179,8 +179,8 @@ class OpenAIService:
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": {"url": image_url}}
+                        {"type": "input_text", "text": prompt},
+                        {"type": "input_image", "image_url": {"url": image_url}}
                     ],
                 }
             ]
@@ -277,11 +277,32 @@ class OpenAIService:
     def _convert_context_to_responses_input(self, context: List[Dict[str, str]]):
         converted = []
         for message in context:
-            text = message.get("content", "")
+            role = message.get("role", "user") or "user"
+            raw_content = message.get("content", "")
+
+            if isinstance(raw_content, list):
+                text_parts = []
+                for item in raw_content:
+                    if isinstance(item, dict):
+                        segment = item.get("text")
+                        if segment:
+                            text_parts.append(segment)
+                    elif item:
+                        text_parts.append(str(item))
+                text = " ".join(text_parts).strip()
+            else:
+                if isinstance(raw_content, str):
+                    text = raw_content
+                elif raw_content is None:
+                    text = ""
+                else:
+                    text = str(raw_content)
+
+            content_type = "output_text" if role == "assistant" else "input_text"
             converted.append(
                 {
-                    "role": message.get("role", "user"),
-                    "content": [{"type": "text", "text": text}],
+                    "role": role,
+                    "content": [{"type": content_type, "text": text}],
                 }
             )
         return converted
@@ -316,11 +337,20 @@ class OpenAIService:
         output = getattr(response, "output", None) or []
         collected = []
         for item in output:
-            contents = getattr(item, "content", None) or item.get("content", [])
+            contents = getattr(item, "content", None)
+            if contents is None:
+                if isinstance(item, dict):
+                    contents = item.get("content", [])
+                else:
+                    contents = []
             for content in contents:
-                content_type = getattr(content, "type", None) or content.get("type")
+                content_type = getattr(content, "type", None)
+                if content_type is None and isinstance(content, dict):
+                    content_type = content.get("type")
                 if content_type == "output_text":
-                    text_value = getattr(content, "text", None) or content.get("text")
+                    text_value = getattr(content, "text", None)
+                    if text_value is None and isinstance(content, dict):
+                        text_value = content.get("text")
                     if text_value:
                         collected.append(text_value)
         return "\n".join(collected).strip()
