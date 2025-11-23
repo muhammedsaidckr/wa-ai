@@ -4,6 +4,8 @@ Integration with WAHA server for WhatsApp messaging
 """
 
 from typing import Optional, Dict, Any
+import asyncio
+import random
 import httpx
 import structlog
 
@@ -27,6 +29,134 @@ class WAHAService:
             "Content-Type": "application/json",
         }
 
+    def _get_chat_id(self, phone_number: str) -> str:
+        """
+        Convert phone number to WAHA chat ID format
+
+        Args:
+            phone_number: Phone number with country code
+
+        Returns:
+            Chat ID in format: number@c.us
+        """
+        # Clean phone number (remove + and spaces, keep numbers only)
+        clean_number = phone_number.replace("+", "").replace(" ", "").replace("-", "")
+        return f"{clean_number}@c.us"
+
+    async def send_seen(self, to_number: str) -> bool:
+        """
+        Mark messages as seen (read)
+
+        Args:
+            to_number: Recipient phone number (with country code)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            chat_id = self._get_chat_id(to_number)
+            url = f"{self.api_url}/api/sendSeen"
+            headers = self._get_headers()
+
+            payload = {
+                "session": self.session_name,
+                "chatId": chat_id,
+            }
+
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(url, json=payload, headers=headers)
+
+                if response.status_code not in [200, 201]:
+                    logger.warning(
+                        "waha_send_seen_failed",
+                        status_code=response.status_code,
+                        to=chat_id,
+                    )
+                    return False
+
+                logger.debug("waha_send_seen_success", to=chat_id)
+                return True
+
+        except Exception as e:
+            logger.error("waha_send_seen_error", error=str(e), to=to_number)
+            return False
+
+    async def start_typing(self, to_number: str) -> bool:
+        """
+        Start typing indicator
+
+        Args:
+            to_number: Recipient phone number (with country code)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            chat_id = self._get_chat_id(to_number)
+            url = f"{self.api_url}/api/startTyping"
+            headers = self._get_headers()
+
+            payload = {
+                "session": self.session_name,
+                "chatId": chat_id,
+            }
+
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(url, json=payload, headers=headers)
+
+                if response.status_code not in [200, 201]:
+                    logger.warning(
+                        "waha_start_typing_failed",
+                        status_code=response.status_code,
+                        to=chat_id,
+                    )
+                    return False
+
+                logger.debug("waha_start_typing_success", to=chat_id)
+                return True
+
+        except Exception as e:
+            logger.error("waha_start_typing_error", error=str(e), to=to_number)
+            return False
+
+    async def stop_typing(self, to_number: str) -> bool:
+        """
+        Stop typing indicator
+
+        Args:
+            to_number: Recipient phone number (with country code)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            chat_id = self._get_chat_id(to_number)
+            url = f"{self.api_url}/api/stopTyping"
+            headers = self._get_headers()
+
+            payload = {
+                "session": self.session_name,
+                "chatId": chat_id,
+            }
+
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(url, json=payload, headers=headers)
+
+                if response.status_code not in [200, 201]:
+                    logger.warning(
+                        "waha_stop_typing_failed",
+                        status_code=response.status_code,
+                        to=chat_id,
+                    )
+                    return False
+
+                logger.debug("waha_stop_typing_success", to=chat_id)
+                return True
+
+        except Exception as e:
+            logger.error("waha_stop_typing_error", error=str(e), to=to_number)
+            return False
+
     async def send_message(
         self,
         to_number: str,
@@ -36,6 +166,13 @@ class WAHAService:
     ) -> Optional[str]:
         """
         Send WhatsApp message via WAHA API
+
+        Implements anti-spam flow:
+        1. Send 'seen' status
+        2. Start typing indicator
+        3. Wait realistic delay based on message length
+        4. Stop typing indicator
+        5. Send message
 
         Args:
             to_number: Recipient phone number (with country code)
@@ -47,11 +184,36 @@ class WAHAService:
             Message ID if successful, None otherwise
         """
         try:
-            # Clean phone number (remove + and spaces, keep numbers only)
-            clean_number = to_number.replace("+", "").replace(" ", "").replace("-", "")
-            # WAHA expects chatId in format: number@c.us
-            chat_id = f"{clean_number}@c.us"
+            # Get chat ID
+            chat_id = self._get_chat_id(to_number)
 
+            # Step 1: Send 'seen' status
+            await self.send_seen(to_number)
+
+            # Step 2: Start typing indicator
+            await self.start_typing(to_number)
+
+            # Step 3: Calculate realistic typing delay
+            # Base delay: 50-100ms per character
+            # Min: 1 second, Max: 5 seconds
+            message_length = len(message) if message else 0
+            base_delay = message_length * random.uniform(0.05, 0.1)
+            typing_delay = max(1.0, min(5.0, base_delay))
+
+            logger.debug(
+                "waha_typing_delay",
+                to=chat_id,
+                message_length=message_length,
+                delay_seconds=typing_delay,
+            )
+
+            # Wait to simulate realistic typing
+            await asyncio.sleep(typing_delay)
+
+            # Step 4: Stop typing indicator
+            await self.stop_typing(to_number)
+
+            # Step 5: Send the actual message
             url = f"{self.api_url}/api/sendText"
             headers = self._get_headers()
 
