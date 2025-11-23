@@ -7,6 +7,7 @@ from app.models.crud import UserCRUD, ConversationCRUD, MessageCRUD
 from app.services.openai_service import openai_service
 from app.services.twilio_service import twilio_service
 from app.services.meta_whatsapp_service import meta_whatsapp_service
+from app.services.waha_service import waha_service
 from app.services.media_service import media_service
 from config.settings import settings
 
@@ -19,7 +20,7 @@ class MessageProcessor:
     def __init__(self, db: Session):
         self.db = db
         self.whitelisted_numbers = settings.get_whitelisted_numbers()
-        self.provider = settings.whatsapp_provider  # "twilio" or "meta"
+        self.provider = settings.whatsapp_provider  # "twilio", "meta", or "waha"
 
     async def process_incoming_message(
         self,
@@ -306,7 +307,7 @@ class MessageProcessor:
     async def _send_response(
         self, to_number: str, message: str, user_id: int, conversation_id: int
     ):
-        """Send response message via configured provider (Twilio or Meta)"""
+        """Send response message via configured provider (Twilio, Meta, or WAHA)"""
         # Validate message is not empty
         if not message or not message.strip():
             logger.error(
@@ -317,7 +318,9 @@ class MessageProcessor:
             message = "Üzgünüm, bir yanıt oluşturamadım. Lütfen tekrar deneyin."
 
         # Send via appropriate provider
-        if self.provider == "meta":
+        if self.provider == "waha":
+            message_sid = await waha_service.send_message(to_number, message)
+        elif self.provider == "meta":
             message_sid = await meta_whatsapp_service.send_message(to_number, message)
         else:  # twilio
             message_sid = await twilio_service.send_message(to_number, message)
@@ -331,7 +334,7 @@ class MessageProcessor:
                 direction=MessageDirection.OUTGOING,
                 message_type=MessageType.TEXT,
                 content=message,
-                twilio_message_sid=message_sid,  # Also used for Meta message ID
+                twilio_message_sid=message_sid,  # Also used for Meta/WAHA message ID
             )
 
     async def _send_not_whitelisted_message(self, to_number: str):
@@ -340,7 +343,9 @@ class MessageProcessor:
             "Üzgünüm, bu botu kullanma yetkiniz yok. "
             "Erişim için lütfen yönetici ile iletişime geçin."
         )
-        if self.provider == "meta":
+        if self.provider == "waha":
+            await waha_service.send_message(to_number, message)
+        elif self.provider == "meta":
             await meta_whatsapp_service.send_message(to_number, message)
         else:
             await twilio_service.send_message(to_number, message)
@@ -351,7 +356,9 @@ class MessageProcessor:
             "Üzgünüm, mesajınızı işlerken bir hata oluştu. "
             "Lütfen daha sonra tekrar deneyin."
         )
-        if self.provider == "meta":
+        if self.provider == "waha":
+            await waha_service.send_message(to_number, message)
+        elif self.provider == "meta":
             await meta_whatsapp_service.send_message(to_number, message)
         else:
             await twilio_service.send_message(to_number, message)

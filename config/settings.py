@@ -22,20 +22,25 @@ class Settings(BaseSettings):
         alias="DATABASE_URL"
     )
 
-    # WhatsApp Provider (twilio or meta)
-    whatsapp_provider: str = Field(default="twilio", alias="WHATSAPP_PROVIDER")
+    # WhatsApp Provider (twilio, meta, or waha)
+    whatsapp_provider: str = Field(default="waha", alias="WHATSAPP_PROVIDER")
 
-    # Twilio (optional if using Meta)
+    # Twilio (optional if using other providers)
     twilio_account_sid: str = Field(default="", alias="TWILIO_ACCOUNT_SID")
     twilio_auth_token: str = Field(default="", alias="TWILIO_AUTH_TOKEN")
     twilio_whatsapp_number: str = Field(default="", alias="TWILIO_WHATSAPP_NUMBER")
     twilio_webhook_url: str = Field(default="", alias="TWILIO_WEBHOOK_URL")
 
-    # Meta WhatsApp Cloud API (optional if using Twilio)
+    # Meta WhatsApp Cloud API (optional if using other providers)
     meta_access_token: str = Field(default="", alias="META_ACCESS_TOKEN")
     meta_phone_number_id: str = Field(default="", alias="META_PHONE_NUMBER_ID")
     meta_business_account_id: str = Field(default="", alias="META_BUSINESS_ACCOUNT_ID")
     meta_webhook_verify_token: str = Field(default="", alias="META_WEBHOOK_VERIFY_TOKEN")
+
+    # WAHA (WhatsApp HTTP API) Configuration
+    waha_api_url: str = Field(default="", alias="WAHA_API_URL")
+    waha_api_key: str = Field(default="", alias="WAHA_API_KEY")
+    waha_session_name: str = Field(default="default", alias="WAHA_SESSION_NAME")
 
     # OpenAI
     openai_api_key: str = Field(..., alias="OPENAI_API_KEY")

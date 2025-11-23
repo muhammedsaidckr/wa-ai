@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 
 from app.api.webhook import router as webhook_router
 from app.api.meta_webhook import router as meta_webhook_router
+from app.api.waha_webhook import router as waha_webhook_router
 from app.models.database import create_db_engine, init_database, get_database_url
 from config.settings import settings
 
@@ -51,15 +52,22 @@ async def lifespan(app: FastAPI):
 
     # Validate configuration
     try:
-        # Check Twilio credentials
-        if not settings.twilio_account_sid or not settings.twilio_auth_token:
-            logger.warning("twilio_credentials_missing")
+        # Check WhatsApp provider credentials
+        if settings.whatsapp_provider == "waha":
+            if not settings.waha_api_url or not settings.waha_api_key:
+                logger.warning("waha_credentials_missing")
+        elif settings.whatsapp_provider == "meta":
+            if not settings.meta_access_token or not settings.meta_phone_number_id:
+                logger.warning("meta_credentials_missing")
+        elif settings.whatsapp_provider == "twilio":
+            if not settings.twilio_account_sid or not settings.twilio_auth_token:
+                logger.warning("twilio_credentials_missing")
 
         # Check OpenAI credentials
         if not settings.openai_api_key:
             logger.warning("openai_credentials_missing")
 
-        logger.info("configuration_validated")
+        logger.info("configuration_validated", provider=settings.whatsapp_provider)
     except Exception as e:
         logger.error("configuration_validation_failed", error=str(e))
 
@@ -89,6 +97,7 @@ app.add_middleware(
 # Include routers
 app.include_router(webhook_router, tags=["Twilio Webhook"])
 app.include_router(meta_webhook_router, tags=["Meta Webhook"])
+app.include_router(waha_webhook_router, tags=["WAHA Webhook"])
 
 
 @app.get("/")
