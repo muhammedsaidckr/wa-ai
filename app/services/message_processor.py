@@ -189,7 +189,16 @@ class MessageProcessor:
             if not image_path:
                 return "Sorry, I couldn't download the image."
 
-            # Analyze image
+            # Convert image to base64 so OpenAI can process it without fetching from URL
+            base64_data, mime_type = media_service.encode_file_to_base64(
+                image_path, fallback_mime="image/jpeg"
+            )
+
+            if not base64_data:
+                media_service.cleanup_file(image_path)
+                return "Sorry, I couldn't read the image content."
+
+            # Analyze image via OpenAI Vision API
             prompt = (
                 f"Describe this image. {caption}"
                 if caption
@@ -200,8 +209,10 @@ class MessageProcessor:
                 prompt_tokens,
                 completion_tokens,
             ) = await openai_service.analyze_image(
-                media_url,  # OpenAI can fetch from URL
+                base64_data,
                 prompt,
+                is_base64=True,
+                mime_type=mime_type,
             )
 
             # Clean up downloaded file

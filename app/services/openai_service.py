@@ -100,13 +100,22 @@ class OpenAIService:
             logger.error("openai_error", error=str(e))
             raise
 
-    async def analyze_image(self, image_url: str, prompt: Optional[str] = None) -> Tuple[str, int, int]:
+    async def analyze_image(
+        self,
+        image_source: str,
+        prompt: Optional[str] = None,
+        *,
+        is_base64: bool = False,
+        mime_type: Optional[str] = None,
+    ) -> Tuple[str, int, int]:
         """
         Analyze image using OpenAI Vision API
 
         Args:
-            image_url: URL of the image
+            image_source: URL of the image or base64-encoded image data
             prompt: Optional custom prompt for analysis
+            is_base64: Set True when image_source contains raw base64 data
+            mime_type: MIME type of the image (used when providing base64 data)
 
         Returns:
             Tuple of (analysis_text, prompt_tokens, completion_tokens)
@@ -115,7 +124,12 @@ class OpenAIService:
             default_prompt = "Describe this image in detail. What do you see?"
             analysis_prompt = prompt or default_prompt
 
-            response = await self._create_vision_completion(image_url, analysis_prompt)
+            response = await self._create_vision_completion(
+                image_source,
+                analysis_prompt,
+                is_base64=is_base64,
+                mime_type=mime_type,
+            )
 
             analysis = self._extract_text(response)
             prompt_tokens, completion_tokens = self._extract_usage_tokens(response)
@@ -172,15 +186,30 @@ class OpenAIService:
             return await self._call_responses_api(context)
         return await self._call_chat_api(context)
 
-    async def _create_vision_completion(self, image_url: str, prompt: str):
+    async def _create_vision_completion(
+        self,
+        image_source: str,
+        prompt: str,
+        *,
+        is_base64: bool = False,
+        mime_type: Optional[str] = None,
+    ):
         """Create a multimodal completion for image analysis."""
+        mime_value = mime_type or "image/jpeg"
+
         if self._uses_responses_api(settings.vision_model):
+            image_payload = {"type": "input_image"}
+            if is_base64:
+                image_payload["image_base64"] = image_source
+            else:
+                image_payload["image_url"] = {"url": image_source}
+
             response_input = [
                 {
                     "role": "user",
                     "content": [
                         {"type": "input_text", "text": prompt},
-                        {"type": "input_image", "image_url": {"url": image_url}}
+                        image_payload,
                     ],
                 }
             ]
@@ -197,6 +226,11 @@ class OpenAIService:
             return await self._call_responses_api([], params_override=params)
 
         # Fallback to legacy chat completion vision call
+        if is_base64:
+            encoded_url = f"data:{mime_value};base64,{image_source}"
+        else:
+            encoded_url = image_source
+
         vision_params = {
             "model": settings.vision_model,
             "messages": [
@@ -204,7 +238,7 @@ class OpenAIService:
                     "role": "user",
                     "content": [
                         {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": {"url": image_url}},
+                        {"type": "image_url", "image_url": {"url": encoded_url}},
                     ],
                 }
             ],

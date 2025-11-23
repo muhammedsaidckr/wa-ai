@@ -1,4 +1,6 @@
 import os
+import base64
+import mimetypes
 import httpx
 from typing import Optional, Tuple
 from pathlib import Path
@@ -142,6 +144,30 @@ class MediaService:
                 logger.info("media_file_cleaned", path=file_path)
         except Exception as e:
             logger.error("file_cleanup_error", error=str(e), path=file_path)
+
+    def encode_file_to_base64(self, file_path: str, fallback_mime: str = "application/octet-stream") -> Tuple[Optional[str], Optional[str]]:
+        """
+        Read file and return (base64_string, mime_type)
+
+        Args:
+            file_path: Path to media file
+            fallback_mime: MIME type to use if detection fails
+
+        Returns:
+            Tuple of base64 string and mime type, or (None, None) on failure
+        """
+        try:
+            mime_type, _ = mimetypes.guess_type(file_path)
+            if not mime_type:
+                mime_type = fallback_mime
+
+            with open(file_path, "rb") as f:
+                encoded = base64.b64encode(f.read()).decode("utf-8")
+
+            return encoded, mime_type
+        except Exception as e:
+            logger.error("media_base64_encoding_error", error=str(e), path=file_path)
+            return None, None
 
     def cleanup_old_files(self, max_age_hours: int = 24):
         """
