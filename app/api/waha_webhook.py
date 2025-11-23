@@ -85,7 +85,7 @@ async def waha_webhook_handler(
 
         # Only process message events
         if event != "message":
-            logger.info("waha_webhook_skipped_non_message_event", event=event)
+            logger.info("waha_webhook_skipped_non_message_event", event_type=event)
             return {"status": "ok", "message": "Event ignored"}
 
         # Check if this is an incoming message (not from us)
@@ -188,7 +188,8 @@ async def process_waha_message(payload: Dict[str, Any], session: str, db: Sessio
             media_url=media_url,
             media_content_type=media_content_type,
             twilio_message_sid=message_id,  # Reuse field for WAHA message ID
-            whatsapp_name=contact_name
+            whatsapp_name=contact_name,
+            waha_chat_id=from_number  # Pass original chat ID with suffix (@lid or @c.us)
         )
 
     except Exception as e:

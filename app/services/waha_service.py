@@ -43,18 +43,20 @@ class WAHAService:
         clean_number = phone_number.replace("+", "").replace(" ", "").replace("-", "")
         return f"{clean_number}@c.us"
 
-    async def send_seen(self, to_number: str) -> bool:
+    async def send_seen(self, to_number: str, chat_id: Optional[str] = None) -> bool:
         """
         Mark messages as seen (read)
 
         Args:
             to_number: Recipient phone number (with country code)
+            chat_id: Optional WAHA chat ID with suffix. If not provided, will be constructed from to_number
 
         Returns:
             True if successful, False otherwise
         """
         try:
-            chat_id = self._get_chat_id(to_number)
+            if not chat_id:
+                chat_id = self._get_chat_id(to_number)
             url = f"{self.api_url}/api/sendSeen"
             headers = self._get_headers()
 
@@ -81,18 +83,20 @@ class WAHAService:
             logger.error("waha_send_seen_error", error=str(e), to=to_number)
             return False
 
-    async def start_typing(self, to_number: str) -> bool:
+    async def start_typing(self, to_number: str, chat_id: Optional[str] = None) -> bool:
         """
         Start typing indicator
 
         Args:
             to_number: Recipient phone number (with country code)
+            chat_id: Optional WAHA chat ID with suffix. If not provided, will be constructed from to_number
 
         Returns:
             True if successful, False otherwise
         """
         try:
-            chat_id = self._get_chat_id(to_number)
+            if not chat_id:
+                chat_id = self._get_chat_id(to_number)
             url = f"{self.api_url}/api/startTyping"
             headers = self._get_headers()
 
@@ -119,18 +123,20 @@ class WAHAService:
             logger.error("waha_start_typing_error", error=str(e), to=to_number)
             return False
 
-    async def stop_typing(self, to_number: str) -> bool:
+    async def stop_typing(self, to_number: str, chat_id: Optional[str] = None) -> bool:
         """
         Stop typing indicator
 
         Args:
             to_number: Recipient phone number (with country code)
+            chat_id: Optional WAHA chat ID with suffix. If not provided, will be constructed from to_number
 
         Returns:
             True if successful, False otherwise
         """
         try:
-            chat_id = self._get_chat_id(to_number)
+            if not chat_id:
+                chat_id = self._get_chat_id(to_number)
             url = f"{self.api_url}/api/stopTyping"
             headers = self._get_headers()
 
@@ -163,6 +169,7 @@ class WAHAService:
         message: str,
         media_url: Optional[str] = None,
         media_type: Optional[str] = None,
+        waha_chat_id: Optional[str] = None,
     ) -> Optional[str]:
         """
         Send WhatsApp message via WAHA API
@@ -179,19 +186,20 @@ class WAHAService:
             message: Message text
             media_url: Optional media URL to send
             media_type: Type of media (image, audio, document, video)
+            waha_chat_id: Original WAHA chat ID with suffix (e.g., @lid or @c.us). If not provided, will be constructed from to_number
 
         Returns:
             Message ID if successful, None otherwise
         """
         try:
-            # Get chat ID
-            chat_id = self._get_chat_id(to_number)
+            # Get chat ID - use provided one or construct from phone number
+            chat_id = waha_chat_id if waha_chat_id else self._get_chat_id(to_number)
 
             # Step 1: Send 'seen' status
-            await self.send_seen(to_number)
+            await self.send_seen(to_number, chat_id=chat_id)
 
             # Step 2: Start typing indicator
-            await self.start_typing(to_number)
+            await self.start_typing(to_number, chat_id=chat_id)
 
             # Step 3: Calculate realistic typing delay
             # Base delay: 50-100ms per character
@@ -211,7 +219,7 @@ class WAHAService:
             await asyncio.sleep(typing_delay)
 
             # Step 4: Stop typing indicator
-            await self.stop_typing(to_number)
+            await self.stop_typing(to_number, chat_id=chat_id)
 
             # Step 5: Send the actual message
             url = f"{self.api_url}/api/sendText"

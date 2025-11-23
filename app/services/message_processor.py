@@ -31,6 +31,7 @@ class MessageProcessor:
         media_content_type: Optional[str] = None,
         twilio_message_sid: Optional[str] = None,
         whatsapp_name: Optional[str] = None,
+        waha_chat_id: Optional[str] = None,
     ) -> bool:
         """
         Process incoming WhatsApp message
@@ -43,6 +44,7 @@ class MessageProcessor:
             media_content_type: Content type of media
             twilio_message_sid: Twilio message ID
             whatsapp_name: Sender's WhatsApp name
+            waha_chat_id: Original WAHA chat ID with suffix (@lid or @c.us)
 
         Returns:
             bool: True if processed successfully
@@ -115,7 +117,7 @@ class MessageProcessor:
                 response_preview=response_text[:100] if response_text else "EMPTY",
             )
             await self._send_response(
-                from_number, response_text, user.id, conversation.id
+                from_number, response_text, user.id, conversation.id, waha_chat_id
             )
 
             return True
@@ -305,7 +307,7 @@ class MessageProcessor:
             return "Sorry, I encountered an error processing the document."
 
     async def _send_response(
-        self, to_number: str, message: str, user_id: int, conversation_id: int
+        self, to_number: str, message: str, user_id: int, conversation_id: int, waha_chat_id: Optional[str] = None
     ):
         """Send response message via configured provider (Twilio, Meta, or WAHA)"""
         # Validate message is not empty
@@ -319,7 +321,7 @@ class MessageProcessor:
 
         # Send via appropriate provider
         if self.provider == "waha":
-            message_sid = await waha_service.send_message(to_number, message)
+            message_sid = await waha_service.send_message(to_number, message, waha_chat_id=waha_chat_id)
         elif self.provider == "meta":
             message_sid = await meta_whatsapp_service.send_message(to_number, message)
         else:  # twilio
